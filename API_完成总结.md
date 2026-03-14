@@ -82,6 +82,7 @@
 | 24 | /api/trade-history/full | GET | 上市以来分时成交 | ✅ 运行中 |
 | 25 | /api/workday/range | GET | 交易日范围查询 | ✅ 运行中 |
 | 26 | /api/income | GET | 收益率区间分析 | ✅ 运行中 |
+| 27 | /api/call-auction | GET | 集合竞价数据 | ✅ 运行中 |
 
 ---
 
@@ -299,7 +300,7 @@ python API_使用示例.py
 ## 🎉 总结
 
 ### 已完成
-✅ **26个完整API接口**（全部已实现并上线）  
+✅ **27个完整API接口**（全部已实现并上线）  
 ✅ **900+行详细文档**  
 ✅ **Python/JavaScript/cURL示例**  
 ✅ **集成指南和最佳实践**  

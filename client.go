@@ -167,6 +167,9 @@ func (this *Client) handlerDealMessage(c *client.Client, msg ios.Acker) {
 	case protocol.TypeKline:
 		resp, err = protocol.MKline.Decode(f.Data, val.(protocol.KlineCache))
 
+	case protocol.TypeCallAuction:
+		resp, err = protocol.MCallAuction.Decode(f.Data)
+
 	default:
 		err = fmt.Errorf("通讯类型未解析:0x%X", f.Type)
 
@@ -794,4 +797,18 @@ func (this *Client) GetKlineYearAll(code string) (*protocol.KlineResp, error) {
 
 func (this *Client) GetKlineYearUntil(code string, f func(k *protocol.Kline) bool) (*protocol.KlineResp, error) {
 	return this.GetKlineUntil(protocol.TypeKlineYear, code, f)
+}
+
+// GetCallAuction 获取集合竞价数据
+// 集合竞价时间段：9:15-9:25（开盘集合竞价），14:57-15:00（收盘集合竞价）
+func (this *Client) GetCallAuction(code string) (*protocol.CallAuctionResp, error) {
+	f, err := protocol.MCallAuction.Frame(code)
+	if err != nil {
+		return nil, err
+	}
+	result, err := this.SendFrame(f)
+	if err != nil {
+		return nil, err
+	}
+	return result.(*protocol.CallAuctionResp), nil
 }

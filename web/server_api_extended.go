@@ -1227,6 +1227,23 @@ func respondKlineSuccess(w http.ResponseWriter, source, klineType string, list [
 	})
 }
 
+// 获取集合竞价数据
+func handleGetCallAuction(w http.ResponseWriter, r *http.Request) {
+	code := strings.TrimSpace(r.URL.Query().Get("code"))
+	if code == "" {
+		errorResponse(w, "股票代码不能为空")
+		return
+	}
+
+	resp, err := client.GetCallAuction(code)
+	if err != nil {
+		errorResponse(w, fmt.Sprintf("获取集合竞价数据失败: %v", err))
+		return
+	}
+
+	successResponse(w, resp)
+}
+
 func fetchIndexAll(code, klineType string) ([]*protocol.Kline, error) {
 	switch strings.ToLower(klineType) {
 	case "minute1":

@@ -307,6 +307,15 @@ class StockAPI:
             return data['data']
         return None
 
+    def get_call_auction(self, code):
+        """获取集合竞价数据"""
+        url = f"{self.base_url}/api/call-auction?code={code}"
+        response = requests.get(url)
+        data = response.json()
+        if data['code'] == 0:
+            return data['data']
+        return None
+
 
 def example1_get_quote():
     """示例1: 获取实时行情"""
@@ -649,6 +658,27 @@ def example10_advanced_endpoints():
                   f"(收盘 {item['current']['close']/1000:.2f} 元)")
 
 
+def example11_call_auction():
+    """示例11: 获取集合竞价数据"""
+    print("\n" + "="*50)
+    print("示例11: 获取集合竞价数据")
+    print("="*50)
+    
+    api = StockAPI()
+    auction_data = api.get_call_auction("000001")
+    
+    if auction_data and auction_data.get('list'):
+        print(f"获取到 {len(auction_data['list'])} 条集合竞价记录")
+        print("\n集合竞价数据（前5条）:")
+        for item in auction_data['list'][:5]:
+            time_str = item['time'][11:19]  # 提取 HH:MM:SS
+            price = item['price'] / 1000  # 转为元
+            volume = item['volume']
+            print(f"  {time_str}: 价格 {price:.2f}元, 成交量 {volume}手")
+    else:
+        print("暂无集合竞价数据（非交易时间或数据未就绪）")
+
+
 def main():
     """主函数"""
     print("""
@@ -670,6 +700,7 @@ def main():
         example8_data_tasks()
         example9_data_services()
         example10_advanced_endpoints()
+        example11_call_auction()
         
         print("\n" + "="*50)
         print("所有示例运行完成！")

@@ -740,6 +740,7 @@ func main() {
 	http.HandleFunc("/api/tasks/pull-trade", handleCreatePullTradeTask)
 	http.HandleFunc("/api/tasks", handleListTasks)
 	http.HandleFunc("/api/tasks/", handleTaskOperations)
+	http.HandleFunc("/api/call-auction", handleGetCallAuction)
 
 	port := ":8080"
 	log.Printf("服务启动成功，访问 http://localhost%s\n", port)

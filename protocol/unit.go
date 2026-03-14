@@ -41,6 +41,11 @@ func Uint16(bs []byte) uint16 {
 	return conv.Uint16(Reverse(bs))
 }
 
+// Float32 字节通过小端方式转为float32
+func Float32(bs []byte) float32 {
+	return math.Float32frombits(conv.Uint32(Reverse(bs)))
+}
+
 func UTF8ToGBK(text []byte) []byte {
 	r := bytes.NewReader(text)
 	decoder := transform.NewReader(r, simplifiedchinese.GBK.NewDecoder()) //GB18030

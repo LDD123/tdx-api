@@ -28,7 +28,7 @@
 17. **GET /api/tasks/{id}** - 查询任务详情
 18. **POST /api/tasks/{id}/cancel** - 取消任务
 
-### ✅ 新增数据服务接口（12个）
+### ✅ 新增数据服务接口（13个）
 19. **GET /api/etf** - ETF基金列表
 20. **GET /api/trade-history** - 历史分时成交分页
 21. **GET /api/minute-trade-all** - 全天分时成交汇总
@@ -41,6 +41,7 @@
 28. **GET /api/trade-history/full** - 上市以来分时成交
 29. **GET /api/workday/range** - 交易日范围列表
 30. **GET /api/income** - 收益区间分析
+31. **GET /api/call-auction** - 集合竞价数据
 
 ---
 
@@ -85,6 +86,7 @@ func main() {
 	http.HandleFunc("/api/workday", handleGetWorkday)
 	http.HandleFunc("/api/workday/range", handleGetWorkdayRange)
 	http.HandleFunc("/api/income", handleGetIncome)
+	http.HandleFunc("/api/call-auction", handleGetCallAuction)
 
 	// === 任务调度路由 ===
 	http.HandleFunc("/api/tasks/pull-kline", handleCreatePullKlineTask)
@@ -351,6 +353,7 @@ curl "http://localhost:8080/api/health"
 | /api/market-stats | GET | 市场统计 |
 | /api/server-status | GET | 服务状态 |
 | /api/health | GET | 健康检查 |
+| /api/call-auction | GET | 集合竞价数据 |
 
 ### 静态文件
 
