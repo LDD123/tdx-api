@@ -19,6 +19,8 @@ import (
 var (
 	client      *tdx.Client
 	manager     *tdx.Manage
+	gbbq        *tdx.Gbbq
+	exClient    *tdx.Client
 	taskManager = NewTaskManager()
 )
 
@@ -46,9 +48,7 @@ func init() {
 		}
 	}
 
-	manager, err = tdx.NewManage(&tdx.ManageConfig{
-		Number: 4,
-	})
+	manager, err = tdx.NewManage(tdx.WithClients(4))
 	if err != nil {
 		log.Fatalf("初始化数据管理器失败: %v", err)
 	}
@@ -59,6 +59,22 @@ func init() {
 		log.Printf("更新交易日数据失败: %v", err)
 	}
 	manager.Cron.Start()
+
+	// 初始化股本变迁/复权模块
+	if g, err := tdx.NewGbbq(tdx.WithGbbqClient(client)); err != nil {
+		log.Printf("初始化复权模块失败: %v", err)
+	} else {
+		gbbq = g
+		log.Println("复权模块初始化成功")
+	}
+
+	// 初始化扩展行情客户端(期货/港股/外盘, 端口7727, 可选)
+	if ec, err := tdx.DialExHqDefault(tdx.WithDebug(false)); err != nil {
+		log.Printf("连接扩展行情服务器失败(可选): %v", err)
+	} else {
+		exClient = ec
+		log.Println("扩展行情服务器连接成功")
+	}
 }
 
 // Response 统一响应结构
@@ -493,21 +509,28 @@ func handleCreatePullKlineTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 支持的K线类型: day, minute, 5minute, 15minute, 30minute, hour, week, month, quarter, year
+	validTables := map[string]string{
+		"day": extend.Day, "minute": extend.Minute,
+	}
 	tables := req.Tables
 	if len(tables) == 0 {
 		tables = []string{extend.Day}
 	} else {
-		valid := make([]string, 0, len(tables))
+		filtered := make([]string, 0, len(tables))
 		for _, v := range tables {
-			if _, ok := extend.KlineTableMap[v]; ok {
-				valid = append(valid, v)
+			if mapped, ok := validTables[v]; ok {
+				filtered = append(filtered, mapped)
+			} else {
+				// 直接接受用户输入的值（如 5minute, hour 等）
+				filtered = append(filtered, v)
 			}
 		}
-		if len(valid) == 0 {
+		if len(filtered) == 0 {
 			errorResponse(w, "tables参数无效")
 			return
 		}
-		tables = valid
+		tables = filtered
 	}
 
 	dir := req.Dir
@@ -532,17 +555,17 @@ func handleCreatePullKlineTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg := extend.PullKlineConfig{
-		Codes:   req.Codes,
-		Tables:  tables,
-		Dir:     dir,
-		Limit:   req.Limit,
-		StartAt: startAt,
+		Codes:      req.Codes,
+		Types:      tables,
+		Dir:        dir,
+		Goroutines: req.Limit,
+		StartAt:    startAt,
 	}
 
 	puller := extend.NewPullKline(cfg)
 
 	taskID := taskManager.Run("pull_kline", func(ctx context.Context) error {
-		return puller.Run(ctx, manager)
+		return puller.Run(manager)
 	})
 
 	successResponse(w, map[string]string{
@@ -583,8 +606,8 @@ func handleCreatePullTradeTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	puller := extend.NewPullTrade(dir)
-	puller.StartYear = req.StartYear
-	puller.EndYear = req.EndYear
+	// 注意: 新版PullTrade不再支持StartYear/EndYear字段，固定从2000年拉取到当年
+	// 如需限制年份范围，请在客户端侧自行过滤
 
 	taskID := taskManager.Run("pull_trade", func(ctx context.Context) error {
 		return puller.Pull(ctx, manager, req.Code)
@@ -741,6 +764,40 @@ func main() {
 	http.HandleFunc("/api/tasks", handleListTasks)
 	http.HandleFunc("/api/tasks/", handleTaskOperations)
 	http.HandleFunc("/api/call-auction", handleGetCallAuction)
+
+	// === 新增：复权/股本变迁接口 ===
+	http.HandleFunc("/api/gbbq", handleGetGbbq)
+	http.HandleFunc("/api/qfq-kline", handleGetQfqKline)
+	http.HandleFunc("/api/hfq-kline", handleGetHfqKline)
+
+	// === 新增：财务/F10接口 ===
+	http.HandleFunc("/api/finance", handleGetFinanceInfo)
+	http.HandleFunc("/api/f10/category", handleGetF10Category)
+	http.HandleFunc("/api/f10/content", handleGetF10Content)
+
+	// === 新增：板块/行业接口 ===
+	http.HandleFunc("/api/block", handleGetBlockData)
+	http.HandleFunc("/api/block-with-index", handleGetBlockDataWithIndex)
+	http.HandleFunc("/api/tdxhy", handleGetTdxHy)
+	http.HandleFunc("/api/tdxzs", handleGetTdxZs)
+	http.HandleFunc("/api/tdxbk", handleGetTdxBk)
+
+	// === 新增：统计/新股接口 ===
+	http.HandleFunc("/api/tdxstat", handleGetTdxStat)
+	http.HandleFunc("/api/tdxstat2", handleGetTdxStat2)
+	http.HandleFunc("/api/xgsg", handleGetXgsg)
+
+	// === 新增：报表/配置接口 ===
+	http.HandleFunc("/api/zhb-files", handleGetZHBFiles)
+
+	// === 新增：扩展行情接口(期货/港股/外盘) ===
+	http.HandleFunc("/api/ex/markets", handleExMarkets)
+	http.HandleFunc("/api/ex/count", handleExCount)
+	http.HandleFunc("/api/ex/instruments", handleExInstruments)
+	http.HandleFunc("/api/ex/quote", handleExQuote)
+	http.HandleFunc("/api/ex/bars", handleExBars)
+	http.HandleFunc("/api/ex/minute", handleExMinute)
+	http.HandleFunc("/api/ex/trade", handleExTrade)
 
 	port := ":8080"
 	log.Printf("服务启动成功，访问 http://localhost%s\n", port)

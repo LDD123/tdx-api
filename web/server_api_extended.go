@@ -930,7 +930,7 @@ func handleGetIncome(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	klines := buildExtendKlines(code, resp.List)
+	klines := resp.List
 	incomes := extend.DoIncomes(klines, startDate, dayOffsets...)
 
 	list := make([]map[string]interface{}, 0, len(incomes))
@@ -1083,18 +1083,12 @@ func buildExtendKlines(code string, list []*protocol.Kline) extend.Klines {
 			continue
 		}
 		ks = append(ks, &extend.Kline{
-			Code:   code,
-			Date:   item.Time.Unix(),
-			Open:   item.Open,
-			High:   item.High,
-			Low:    item.Low,
-			Close:  item.Close,
-			Volume: item.Volume,
-			Amount: item.Amount,
+			Unix:   item.Time.Unix(),
+			Kline:  item,
 		})
 	}
 	sort.Slice(ks, func(i, j int) bool {
-		return ks[i].Date < ks[j].Date
+		return ks[i].Unix < ks[j].Unix
 	})
 	return ks
 }

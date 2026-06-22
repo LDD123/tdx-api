@@ -2,14 +2,16 @@ package protocol
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
-	"github.com/injoyai/conv"
-	"golang.org/x/text/encoding/simplifiedchinese"
-	"golang.org/x/text/transform"
 	"io"
 	"math"
 	"strings"
 	"time"
+
+	"github.com/injoyai/conv"
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
 )
 
 // String 字节先转小端,再转字符
@@ -36,14 +38,16 @@ func Uint32(bs []byte) uint32 {
 	return conv.Uint32(Reverse(bs))
 }
 
+// Float32 字节通过小端方式转为float32
+func Float32(bs []byte) float32 {
+	var f float32
+	binary.Read(bytes.NewBuffer(bs), binary.LittleEndian, &f)
+	return f
+}
+
 // Uint16 字节通过小端方式转为uint16
 func Uint16(bs []byte) uint16 {
 	return conv.Uint16(Reverse(bs))
-}
-
-// Float32 字节通过小端方式转为float32
-func Float32(bs []byte) float32 {
-	return math.Float32frombits(conv.Uint32(Reverse(bs)))
 }
 
 func UTF8ToGBK(text []byte) []byte {
@@ -131,16 +135,29 @@ func GetTime(bs [4]byte, Type uint8) time.Time {
 	}
 }
 
+//func basePrice(code string) Price {
+//	if len(code) < 2 {
+//		return 1
+//	}
+//	switch code[:1] {
+//	case "8":
+//		return 1
+//	}
+//	switch code[:2] {
+//	case "60", "30", "68", "00", "92", "43", "39":
+//		return 1
+//	default:
+//		return 1
+//	}
+//}
+
 func basePrice(code string) Price {
-	if len(code) < 2 {
+	switch {
+	case IsETF(code):
+		return 10
+	case IsStock(code):
 		return 1
-	}
-	switch code[:1] {
-	case "8":
-		return 1
-	}
-	switch code[:2] {
-	case "60", "30", "68", "00", "92", "43", "39":
+	case IsIndex(code):
 		return 1
 	default:
 		return 1
@@ -249,33 +266,39 @@ func getVolume2(val uint32) float64 {
 // IsStock 是否是股票,示例sz000001
 func IsStock(code string) bool {
 	return IsSZStock(code) || IsSHStock(code) || IsBJStock(code)
-
-	//if len(code) != 8 {
-	//	return false
-	//}
-	//code = strings.ToLower(code)
-	//switch {
-	//case code[0:2] == ExchangeSH.String() &&
-	//	(code[2:3] == "6"):
-	//	return true
-	//
-	//case code[0:2] == ExchangeSZ.String() &&
-	//	(code[2:3] == "0" || code[2:4] == "30"):
-	//	return true
-	//}
-	//return false
 }
 
 func IsSZStock(code string) bool {
-	return len(code) == 8 && strings.ToLower(code[0:2]) == ExchangeSZ.String() && (code[2:3] == "0" || code[2:4] == "30")
+	return len(code) == 8 && strings.ToLower(code[0:2]) == ExchangeSZ.String() && isSZStock(code[2:])
 }
 
 func IsSHStock(code string) bool {
-	return len(code) == 8 && strings.ToLower(code[0:2]) == ExchangeSH.String() && code[2:3] == "6"
+	return len(code) == 8 && strings.ToLower(code[0:2]) == ExchangeSH.String() && isSHStock(code[2:])
 }
 
 func IsBJStock(code string) bool {
-	return len(code) == 8 && strings.ToLower(code[0:2]) == ExchangeBJ.String() && (code[2:4] == "92" || code[2:4] == "43" || code[2:3] == "8")
+	return len(code) == 8 && strings.ToLower(code[0:2]) == ExchangeBJ.String() && isBJStock(code[2:])
+}
+
+func isSHStock(code string) bool {
+	if len(code) != 6 {
+		return false
+	}
+	return code[:1] == "6"
+}
+
+func isSZStock(code string) bool {
+	if len(code) != 6 {
+		return false
+	}
+	return code[:1] == "0" || code[:2] == "30"
+}
+
+func isBJStock(code string) bool {
+	if len(code) != 6 {
+		return false
+	}
+	return code[:2] == "92"
 }
 
 // IsETF 是否是基金,示例sz159558
@@ -285,39 +308,102 @@ func IsETF(code string) bool {
 	}
 	code = strings.ToLower(code)
 	switch {
-	case code[0:2] == ExchangeSH.String() &&
-		(code[2:4] == "51" || code[2:4] == "56" || code[2:4] == "58"):
+	case code[0:2] == ExchangeSH.String() && isSHETF(code[2:]):
 		return true
-
-	case code[0:2] == ExchangeSZ.String() &&
-		(code[2:4] == "15" || code[2:4] == "16"):
+	case code[0:2] == ExchangeSZ.String() && isSZETF(code[2:]):
 		return true
 	}
 	return false
+}
+
+func isSHETF(code string) bool {
+	if len(code) != 6 {
+		return false
+	}
+	switch code[:2] {
+	case "50", "51", "52", "53", "56", "58": //55不是
+		return true
+	}
+
+	return false
+}
+
+func isSZETF(code string) bool {
+	if len(code) != 6 {
+		return false
+	}
+	return code[:2] == "15" || code[:2] == "16"
+}
+
+func isBJETF(code string) bool {
+	if len(code) != 6 {
+		return false
+	}
+	return false
+}
+
+// IsIndex 是否是指数,sh000001,sz399001,bj899100
+func IsIndex(code string) bool {
+	if len(code) != 8 {
+		return false
+	}
+	code = strings.ToLower(code)
+	switch {
+	case code[0:2] == ExchangeSH.String() && isSHIndex(code[2:]):
+		return true
+	case code[0:2] == ExchangeSZ.String() && isSZIndex(code[2:]):
+		return true
+	case code[0:2] == ExchangeBJ.String() && isBJIndex(code[2:]):
+		return true
+	}
+	return false
+}
+
+func isSHIndex(code string) bool {
+	if len(code) != 6 {
+		return false
+	}
+	return code[:3] == "000" || code == "999999"
+}
+
+func isSZIndex(code string) bool {
+	if len(code) != 6 {
+		return false
+	}
+	return code[:3] == "399"
+}
+
+func isBJIndex(code string) bool {
+	if len(code) != 6 {
+		return false
+	}
+	return code[:3] == "899"
 }
 
 // AddPrefix 添加股票/基金代码前缀,针对股票/基金生效,例如000001,会增加前缀sz000001(平安银行),而不是sh000001(上证指数)
 func AddPrefix(code string) string {
 	if len(code) == 6 {
 		switch {
-		case code[:1] == "6":
-			//上海股票
-			code = ExchangeSH.String() + code
-		case code[:1] == "0":
-			//深圳股票
-			code = ExchangeSZ.String() + code
-		case code[:2] == "30":
-			//深圳股票
-			code = ExchangeSZ.String() + code
-		case code[:3] == "510" || code[:3] == "511" || code[:3] == "512" || code[:3] == "513" || code[:3] == "515":
-			//上海基金
-			code = ExchangeSH.String() + code
-		case code[:3] == "159":
-			//深圳基金
-			code = ExchangeSZ.String() + code
-		case code[:1] == "8" || code[:2] == "92" || code[:2] == "43":
-			//北京股票
-			code = ExchangeBJ.String() + code
+		case isSHStock(code):
+			return ExchangeSH.String() + code
+		case isSZStock(code):
+			return ExchangeSZ.String() + code
+		case isBJStock(code):
+			return ExchangeBJ.String() + code
+
+		case isSHETF(code):
+			return ExchangeSH.String() + code
+		case isSZETF(code):
+			return ExchangeSZ.String() + code
+		case isBJETF(code):
+			return ExchangeBJ.String() + code
+
+		case isSHIndex(code):
+			return ExchangeSH.String() + code
+		case isSZIndex(code):
+			return ExchangeSZ.String() + code
+		case isBJIndex(code):
+			return ExchangeBJ.String() + code
 		}
 	}
 	return code
@@ -325,4 +411,16 @@ func AddPrefix(code string) string {
 
 func minutes(t time.Time) int {
 	return t.Hour()*60 + t.Minute()
+}
+
+// I64Sqrt int64版的math.Sqrt
+func I64Sqrt(x int64) int64 {
+	r := int64(math.Sqrt(float64(x)))
+	for (r+1)*(r+1) <= x {
+		r++
+	}
+	for r*r > x {
+		r--
+	}
+	return r
 }

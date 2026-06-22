@@ -12,7 +12,9 @@ require (
 	github.com/goccy/go-json v0.8.1 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/uuid v1.5.0 // indirect
-	github.com/injoyai/base v1.2.17 // indirect
+	github.com/grafov/m3u8 v0.12.1 // indirect
+	github.com/injoyai/bar v0.0.9 // indirect
+	github.com/injoyai/base v1.2.20 // indirect
 	github.com/injoyai/conv v1.2.5 // indirect
 	github.com/injoyai/ios v1.2.2 // indirect
 	github.com/injoyai/logs v1.0.12 // indirect

@@ -2,7 +2,7 @@
 
 ## 🎯 概述
 
-已为您打包完成所有功能的API接口！所有基础与扩展功能已默认集成，包括：
+已集成通达信协议库(tdx)最新版本的全部功能，包括基础行情、扩展数据、复权计算、财务信息、板块数据、统计指标、扩展行情(期货/港股)等。所有接口已默认集成，开箱即用。
 
 ### ✅ 已实现的基础接口（6个）
 1. **GET /api/quote** - 五档行情
@@ -28,7 +28,7 @@
 17. **GET /api/tasks/{id}** - 查询任务详情
 18. **POST /api/tasks/{id}/cancel** - 取消任务
 
-### ✅ 新增数据服务接口（13个）
+### ✅ 数据服务接口（13个）
 19. **GET /api/etf** - ETF基金列表
 20. **GET /api/trade-history** - 历史分时成交分页
 21. **GET /api/minute-trade-all** - 全天分时成交汇总
@@ -43,288 +43,341 @@
 30. **GET /api/income** - 收益区间分析
 31. **GET /api/call-auction** - 集合竞价数据
 
+### ✅ 全量历史K线接口（2个）
+32. **GET /api/kline-all/tdx** - 通达信原始历史K线
+33. **GET /api/kline-all/ths** - 同花顺前复权历史K线
+
+### ✅ 新增：复权/股本变迁接口（3个）🆕
+34. **GET /api/gbbq** - 获取股本变迁/除权除息数据
+35. **GET /api/qfq-kline** - 获取前复权K线（基于通达信gbbq，对齐桌面端）
+36. **GET /api/hfq-kline** - 获取后复权K线
+
+### ✅ 新增：财务/F10接口（3个）🆕
+37. **GET /api/finance** - 获取财务信息（流通股本/总股本/净利润等）
+38. **GET /api/f10/category** - 获取F10公司信息分类目录
+39. **GET /api/f10/content** - 获取F10某分类的文本内容
+
+### ✅ 新增：板块/行业接口（5个）🆕
+40. **GET /api/block** - 获取板块成分（概念/地域/风格）
+41. **GET /api/block-with-index** - 获取板块成分+指数代码ID
+42. **GET /api/tdxhy** - 获取行业归属（通达信/申万）
+43. **GET /api/tdxzs** - 获取板块指数代码映射
+44. **GET /api/tdxbk** - 获取概念板块简称↔全称
+
+### ✅ 新增：统计/新股接口（3个）🆕
+45. **GET /api/tdxstat** - 获取个股综合统计（市盈率/股息率/涨跌幅等）
+46. **GET /api/tdxstat2** - 获取资金流向+板块归属
+47. **GET /api/xgsg** - 获取新股申购列表
+
+### ✅ 新增：报表/配置接口（1个）🆕
+48. **GET /api/zhb-files** - 获取zhb.zip内容文件列表
+
+### ✅ 新增：扩展行情接口（7个）🆕
+49. **GET /api/ex/markets** - 扩展行情市场代码表
+50. **GET /api/ex/count** - 扩展行情品种数量
+51. **GET /api/ex/quote** - 扩展行情单品种五档
+52. **GET /api/ex/bars** - 扩展行情K线
+53. **GET /api/ex/minute** - 扩展行情当日分时
+54. **GET /api/ex/trade** - 扩展行情分笔成交
+
 ---
 
-## 🚀 如何集成扩展接口
+## 🆕 新增功能详解
+
+### 1. 复权/股本变迁（GBBQ）
+
+基于通达信股本变迁(gbbq)数据，实现与通达信桌面端对齐的前/后复权计算。
+
+**核心特性**：
+- 使用仿射变换模型 `price_adj = QFQMul × price_raw + QFQAdd`，四舍五入到分
+- 与通达信桌面端逐日对齐（含配股、大比例送转、股改停牌复合事件）
+- 自动缓存gbbq数据到本地SQLite，定时更新
+- 替代原有的同花顺爬虫方式，更稳定可靠
+
+```bash
+# 获取前复权日K线（推荐，对齐通达信）
+curl "http://localhost:8080/api/qfq-kline?code=000001"
+
+# 获取后复权日K线
+curl "http://localhost:8080/api/hfq-kline?code=000001"
+
+# 获取除权除息数据
+curl "http://localhost:8080/api/gbbq?code=000001"
+```
+
+### 2. 财务信息
+
+获取标的的财务/基本面数据，包括流通股本、总股本、上市日期、股东户数、净利润等30+字段。
+
+```bash
+# 获取财务信息
+curl "http://localhost:8080/api/finance?code=600519"
+
+# 获取F10分类目录
+curl "http://localhost:8080/api/f10/category?code=600519"
+
+# 获取F10内容
+curl "http://localhost:8080/api/f10/content?code=600519&filename=company.txt&start=0&length=5000"
+```
+
+### 3. 板块/行业数据
+
+支持概念板块、地域风格、指数板块的成分查询，以及通达信/申万行业归属。
+
+```bash
+# 获取概念板块成分（默认）
+curl "http://localhost:8080/api/block"
+
+# 获取风格板块（含地域）
+curl "http://localhost:8080/api/block?file=block_fg.dat"
+
+# 获取板块+指数代码ID（自动关联tdxzs.cfg）
+curl "http://localhost:8080/api/block-with-index?file=block_gn.dat"
+
+# 获取行业归属
+curl "http://localhost:8080/api/tdxhy"
+
+# 获取板块指数代码映射
+curl "http://localhost:8080/api/tdxzs"
+
+# 获取概念板块简称↔全称
+curl "http://localhost:8080/api/tdxbk"
+```
+
+**板块文件说明**：
+| 文件名 | 说明 |
+|--------|------|
+| `block_gn.dat` | 概念板块（默认） |
+| `block_fg.dat` | 风格板块（含地域） |
+| `block_zs.dat` | 指数板块 |
+| `block_hy.dat` | 行业板块 |
+
+### 4. 个股统计/新股申购
+
+来自通达信zhb.zip的全市场逐股数据，经10只大市值股对照实盘核验。
+
+```bash
+# 获取个股综合统计（市盈率TTM/静态市盈率/股息率/涨跌幅/连涨连跌/区间涨跌幅）
+curl "http://localhost:8080/api/tdxstat"
+
+# 获取资金流向+板块归属
+curl "http://localhost:8080/api/tdxstat2"
+
+# 获取新股申购
+curl "http://localhost:8080/api/xgsg"
+```
+
+### 5. 扩展行情（期货/港股/外盘）
+
+通过独立端口(7727)连接扩展行情服务器，获取期货、港股、外盘等数据。
+
+```bash
+# 获取市场代码表
+curl "http://localhost:8080/api/ex/markets"
+
+# 获取期货五档行情
+curl "http://localhost:8080/api/ex/quote?market=29&code=IF2401"
+
+# 获取港股五档行情
+curl "http://localhost:8080/api/ex/quote?market=31&code=00700"
+
+# 获取K线数据
+curl "http://localhost:8080/api/ex/bars?category=4&market=29&code=IF2401&start=0&count=100"
+
+# 获取分时数据
+curl "http://localhost:8080/api/ex/minute?market=31&code=00700"
+
+# 获取分笔成交
+curl "http://localhost:8080/api/ex/trade?market=31&code=00700&start=0&count=50"
+```
+
+---
+
+## 🚀 如何集成
 
 > 当前仓库已经完成以下步骤，接口可直接使用；若需要迁移到其他工程或自定义修改，可参考下述说明。
 
-### 方法一：合并到现有server.go（推荐）
-
-在 `web/server.go` 的 `main()` 函数中注册路由：
+### 路由注册（server.go main函数）
 
 ```go
 func main() {
-	// 静态文件服务
-	http.Handle("/", http.FileServer(http.Dir("./static")))
+    // 静态文件服务
+    http.Handle("/", http.FileServer(http.Dir("./static")))
 
-	// === 现有API路由 ===
-	http.HandleFunc("/api/quote", handleGetQuote)
-	http.HandleFunc("/api/kline", handleGetKline)
-	http.HandleFunc("/api/minute", handleGetMinute)
-	http.HandleFunc("/api/trade", handleGetTrade)
-	http.HandleFunc("/api/search", handleSearchCode)
-	http.HandleFunc("/api/stock-info", handleGetStockInfo)
+    // === 现有API路由 ===
+    http.HandleFunc("/api/quote", handleGetQuote)
+    http.HandleFunc("/api/kline", handleGetKline)
+    http.HandleFunc("/api/minute", handleGetMinute)
+    http.HandleFunc("/api/trade", handleGetTrade)
+    http.HandleFunc("/api/search", handleSearchCode)
+    http.HandleFunc("/api/stock-info", handleGetStockInfo)
 
-	// === 扩展API路由 ===
-	http.HandleFunc("/api/codes", handleGetCodes)
-	http.HandleFunc("/api/batch-quote", handleBatchQuote)
-	http.HandleFunc("/api/kline-history", handleGetKlineHistory)
-	http.HandleFunc("/api/index", handleGetIndex)
-	http.HandleFunc("/api/index/all", handleGetIndexAll)
-	http.HandleFunc("/api/market-stats", handleGetMarketStats)
-	http.HandleFunc("/api/market-count", handleGetMarketCount)
-	http.HandleFunc("/api/stock-codes", handleGetStockCodes)
-	http.HandleFunc("/api/etf-codes", handleGetETFCodes)
-	http.HandleFunc("/api/server-status", handleGetServerStatus)
-	http.HandleFunc("/api/health", handleHealthCheck)
-	http.HandleFunc("/api/etf", handleGetETFList)
-	http.HandleFunc("/api/trade-history", handleGetTradeHistory)
-	http.HandleFunc("/api/trade-history/full", handleGetTradeHistoryFull)
-	http.HandleFunc("/api/minute-trade-all", handleGetMinuteTradeAll)
-	http.HandleFunc("/api/kline-all", handleGetKlineAll)
-	http.HandleFunc("/api/workday", handleGetWorkday)
-	http.HandleFunc("/api/workday/range", handleGetWorkdayRange)
-	http.HandleFunc("/api/income", handleGetIncome)
-	http.HandleFunc("/api/call-auction", handleGetCallAuction)
+    // === 扩展API路由 ===
+    http.HandleFunc("/api/codes", handleGetCodes)
+    http.HandleFunc("/api/batch-quote", handleBatchQuote)
+    http.HandleFunc("/api/kline-history", handleGetKlineHistory)
+    http.HandleFunc("/api/index", handleGetIndex)
+    http.HandleFunc("/api/index/all", handleGetIndexAll)
+    http.HandleFunc("/api/market-stats", handleGetMarketStats)
+    http.HandleFunc("/api/market-count", handleGetMarketCount)
+    http.HandleFunc("/api/stock-codes", handleGetStockCodes)
+    http.HandleFunc("/api/etf-codes", handleGetETFCodes)
+    http.HandleFunc("/api/server-status", handleGetServerStatus)
+    http.HandleFunc("/api/health", handleHealthCheck)
+    http.HandleFunc("/api/etf", handleGetETFList)
+    http.HandleFunc("/api/trade-history", handleGetTradeHistory)
+    http.HandleFunc("/api/trade-history/full", handleGetTradeHistoryFull)
+    http.HandleFunc("/api/minute-trade-all", handleGetMinuteTradeAll)
+    http.HandleFunc("/api/kline-all", handleGetKlineAllTDX)
+    http.HandleFunc("/api/kline-all/tdx", handleGetKlineAllTDX)
+    http.HandleFunc("/api/kline-all/ths", handleGetKlineAllTHS)
+    http.HandleFunc("/api/workday", handleGetWorkday)
+    http.HandleFunc("/api/workday/range", handleGetWorkdayRange)
+    http.HandleFunc("/api/income", handleGetIncome)
+    http.HandleFunc("/api/tasks/pull-kline", handleCreatePullKlineTask)
+    http.HandleFunc("/api/tasks/pull-trade", handleCreatePullTradeTask)
+    http.HandleFunc("/api/tasks", handleListTasks)
+    http.HandleFunc("/api/tasks/", handleTaskOperations)
+    http.HandleFunc("/api/call-auction", handleGetCallAuction)
 
-	// === 任务调度路由 ===
-	http.HandleFunc("/api/tasks/pull-kline", handleCreatePullKlineTask)
-	http.HandleFunc("/api/tasks/pull-trade", handleCreatePullTradeTask)
-	http.HandleFunc("/api/tasks", handleListTasks)
-	http.HandleFunc("/api/tasks/", handleTaskOperations)
+    // === 新增：复权/股本变迁接口 ===
+    http.HandleFunc("/api/gbbq", handleGetGbbq)
+    http.HandleFunc("/api/qfq-kline", handleGetQfqKline)
+    http.HandleFunc("/api/hfq-kline", handleGetHfqKline)
 
-	port := ":8080"
-	log.Printf("服务启动成功，访问 http://localhost%s\n", port)
-	log.Fatal(http.ListenAndServe(port, nil))
+    // === 新增：财务/F10接口 ===
+    http.HandleFunc("/api/finance", handleGetFinanceInfo)
+    http.HandleFunc("/api/f10/category", handleGetF10Category)
+    http.HandleFunc("/api/f10/content", handleGetF10Content)
+
+    // === 新增：板块/行业接口 ===
+    http.HandleFunc("/api/block", handleGetBlockData)
+    http.HandleFunc("/api/block-with-index", handleGetBlockDataWithIndex)
+    http.HandleFunc("/api/tdxhy", handleGetTdxHy)
+    http.HandleFunc("/api/tdxzs", handleGetTdxZs)
+    http.HandleFunc("/api/tdxbk", handleGetTdxBk)
+
+    // === 新增：统计/新股接口 ===
+    http.HandleFunc("/api/tdxstat", handleGetTdxStat)
+    http.HandleFunc("/api/tdxstat2", handleGetTdxStat2)
+    http.HandleFunc("/api/xgsg", handleGetXgsg)
+
+    // === 新增：报表/配置接口 ===
+    http.HandleFunc("/api/zhb-files", handleGetZHBFiles)
+
+    // === 新增：扩展行情接口(期货/港股/外盘) ===
+    http.HandleFunc("/api/ex/markets", handleExMarkets)
+    http.HandleFunc("/api/ex/count", handleExCount)
+    http.HandleFunc("/api/ex/quote", handleExQuote)
+    http.HandleFunc("/api/ex/bars", handleExBars)
+    http.HandleFunc("/api/ex/minute", handleExMinute)
+    http.HandleFunc("/api/ex/trade", handleExTrade)
+
+    port := ":8080"
+    log.Printf("服务启动成功，访问 http://localhost%s\n", port)
+    log.Fatal(http.ListenAndServe(port, nil))
 }
 ```
 
-### 方法二：复制扩展函数到server.go
+### 初始化代码（server.go init函数）
 
-需要在其他项目使用时，可将 `server_api_extended.go` 中的函数与工具方法复制到目标项目，并同步注册路由。
+```go
+func init() {
+    // 连接通达信服务器
+    client, err = tdx.DialDefault(tdx.WithDebug(false))
+    if err != nil {
+        log.Fatalf("连接服务器失败: %v", err)
+    }
+
+    // 初始化代码缓存
+    if codes, err := tdx.NewCodesSqlite(client); err != nil {
+        log.Printf("初始化代码库失败: %v", err)
+    } else {
+        tdx.DefaultCodes = codes
+        tdx.DefaultCodes.Update()
+    }
+
+    // 初始化数据管理器（新版使用Option模式）
+    manager, err = tdx.NewManage(tdx.WithClients(4))
+    if err != nil {
+        log.Fatalf("初始化数据管理器失败: %v", err)
+    }
+    manager.Codes.Update()
+    manager.Workday.Update()
+    manager.Cron.Start()
+
+    // 初始化复权模块（基于通达信gbbq，对齐桌面端）
+    if g, err := tdx.NewGbbq(tdx.WithGbbqClient(client)); err != nil {
+        log.Printf("初始化复权模块失败: %v", err)
+    } else {
+        gbbq = g
+    }
+
+    // 初始化扩展行情客户端（期货/港股/外盘，端口7727，可选）
+    if ec, err := tdx.DialExHqDefault(tdx.WithDebug(false)); err != nil {
+        log.Printf("连接扩展行情服务器失败(可选): %v", err)
+    } else {
+        exClient = ec
+    }
+}
+```
 
 ---
 
-## 📝 完整集成步骤
+## ⚠️ 版本更新说明（v1.x → v2.x）
 
-### 步骤1: 添加扩展接口代码
+### 破坏性变更
 
-（示例代码已合并在仓库中，以下片段仅作参考）
+| 旧接口/方法 | 新接口/方法 | 说明 |
+|------------|------------|------|
+| `tdx.NewManage(&tdx.ManageConfig{Number: N})` | `tdx.NewManage(tdx.WithClients(N))` | ManageConfig 改为 Option 模式 |
+| `extend.KlineTableMap` | `extend.Day` / `extend.Minute` | 表映射改为常量 |
+| `extend.PullKlineConfig.Tables` | `extend.PullKlineConfig.Types` | 字段重命名 |
+| `extend.PullKlineConfig.Limit` | `extend.PullKlineConfig.Goroutines` | 字段重命名 |
+| `extend.PullTrade.StartYear/EndYear` | 已移除 | 固定从2000年拉取 |
+| `extend.Kline{Code, Date, ...}` | `extend.Kline{Unix, *protocol.Kline, ...}` | 结构体字段变更 |
 
-```go
-// ==================== 扩展API接口 ====================
+### 新增依赖
 
-// 获取股票代码列表
-func handleGetCodes(w http.ResponseWriter, r *http.Request) {
-	exchange := r.URL.Query().Get("exchange")
-
-	type CodesResponse struct {
-		Total     int                    `json:"total"`
-		Exchanges map[string]int         `json:"exchanges"`
-		Codes     []map[string]string    `json:"codes"`
-	}
-
-	resp := &CodesResponse{
-		Exchanges: make(map[string]int),
-		Codes:     []map[string]string{},
-	}
-
-	exchanges := []protocol.Exchange{}
-	switch strings.ToLower(exchange) {
-	case "sh":
-		exchanges = []protocol.Exchange{protocol.ExchangeSH}
-	case "sz":
-		exchanges = []protocol.Exchange{protocol.ExchangeSZ}
-	case "bj":
-		exchanges = []protocol.Exchange{protocol.ExchangeBJ}
-	default:
-		exchanges = []protocol.Exchange{protocol.ExchangeSH, protocol.ExchangeSZ, protocol.ExchangeBJ}
-	}
-
-	for _, ex := range exchanges {
-		codeResp, err := client.GetCodeAll(ex)
-		if err != nil {
-			continue
-		}
-
-		exName := ""
-		switch ex {
-		case protocol.ExchangeSH:
-			exName = "sh"
-		case protocol.ExchangeSZ:
-			exName = "sz"
-		case protocol.ExchangeBJ:
-			exName = "bj"
-		}
-
-		count := 0
-		for _, v := range codeResp.List {
-			if protocol.IsStock(v.Code) {
-				resp.Codes = append(resp.Codes, map[string]string{
-					"code":     v.Code,
-					"name":     v.Name,
-					"exchange": exName,
-				})
-				count++
-			}
-		}
-		resp.Exchanges[exName] = count
-		resp.Total += count
-	}
-
-	successResponse(w, resp)
-}
-
-// 批量获取行情
-func handleBatchQuote(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		errorResponse(w, "只支持POST请求")
-		return
-	}
-
-	var req struct {
-		Codes []string `json:"codes"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		errorResponse(w, "请求参数错误: "+err.Error())
-		return
-	}
-
-	if len(req.Codes) == 0 {
-		errorResponse(w, "股票代码列表不能为空")
-		return
-	}
-
-	if len(req.Codes) > 50 {
-		errorResponse(w, "一次最多查询50只股票")
-		return
-	}
-
-	quotes, err := client.GetQuote(req.Codes...)
-	if err != nil {
-		errorResponse(w, fmt.Sprintf("获取行情失败: %v", err))
-		return
-	}
-
-	successResponse(w, quotes)
-}
-
-// 健康检查
-func handleHealthCheck(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status": "healthy",
-		"time":   time.Now().Unix(),
-	})
-}
-
-// ... 其他扩展函数（见server_api_extended.go）
-```
-
-### 步骤2: 添加import依赖
-
-在 `server.go` 顶部的import中确保有：
-
-```go
-import (
-	"encoding/json"
-	"fmt"
-	"log"
-	"net/http"
-	"strconv"      // 新增
-	"strings"      // 新增
-	"time"
-
-	"github.com/injoyai/tdx"
-	"github.com/injoyai/tdx/protocol"
-)
-```
-
-### 步骤3: 重新构建部署（如有修改）
-
-```bash
-# 停止服务
-docker-compose down
-
-# 重新构建
-docker-compose build
-
-# 启动服务
-docker-compose up -d
-
-# 查看日志
-docker-compose logs -f
-```
+| 依赖 | 版本 | 说明 |
+|------|------|------|
+| `github.com/injoyai/bar` | v0.0.9 | 进度条 |
+| `github.com/injoyai/base` | v1.2.20 | 基础库（从v1.2.17升级） |
+| `github.com/grafov/m3u8` | v0.12.1 | M3U8解析 |
 
 ---
 
 ## 🧪 测试新接口
 
-### 测试1: 获取股票代码列表
+### 测试1: 前复权K线
 
 ```bash
-# 获取所有股票
-curl "http://localhost:8080/api/codes"
-
-# 只获取上海股票
-curl "http://localhost:8080/api/codes?exchange=sh"
-
-# 只获取深圳股票
-curl "http://localhost:8080/api/codes?exchange=sz"
+curl "http://localhost:8080/api/qfq-kline?code=000001&limit=10"
 ```
 
-预期响应：
-```json
-{
-  "code": 0,
-  "message": "success",
-  "data": {
-    "total": 5234,
-    "exchanges": {
-      "sh": 2156,
-      "sz": 2845,
-      "bj": 233
-    },
-    "codes": [
-      {
-        "code": "000001",
-        "name": "平安银行",
-        "exchange": "sz"
-      }
-    ]
-  }
-}
-```
-
-### 测试2: 批量获取行情
+### 测试2: 财务信息
 
 ```bash
-curl -X POST http://localhost:8080/api/batch-quote \
-  -H "Content-Type: application/json" \
-  -d '{"codes":["000001","600519","601318"]}'
+curl "http://localhost:8080/api/finance?code=600519"
 ```
 
-预期响应：
-```json
-{
-  "code": 0,
-  "message": "success",
-  "data": [
-    { /* 000001的行情数据 */ },
-    { /* 600519的行情数据 */ },
-    { /* 601318的行情数据 */ }
-  ]
-}
-```
-
-### 测试3: 健康与服务状态
+### 测试3: 概念板块
 
 ```bash
-curl "http://localhost:8080/api/server-status"
-curl "http://localhost:8080/api/health"
+curl "http://localhost:8080/api/block-with-index?file=block_gn.dat"
+```
+
+### 测试4: 个股统计
+
+```bash
+curl "http://localhost:8080/api/tdxstat"
+```
+
+### 测试5: 扩展行情
+
+```bash
+curl "http://localhost:8080/api/ex/markets"
+curl "http://localhost:8080/api/ex/quote?market=31&code=00700"
 ```
 
 ---
@@ -337,9 +390,9 @@ curl "http://localhost:8080/api/health"
 |-----|------|------|
 | /api/quote | GET | 五档行情 |
 | /api/kline | GET | K线数据（含日/周/月前复权） |
-| /api/minute | GET | 分时数据（自动回退至最近交易日） |
+| /api/minute | GET | 分时数据 |
 | /api/trade | GET | 分时成交 |
-| /api/search | GET | 搜索股票（支持代码/名称模糊匹配） |
+| /api/search | GET | 搜索股票 |
 | /api/stock-info | GET | 综合信息汇总 |
 
 ### 扩展功能接口
@@ -348,207 +401,101 @@ curl "http://localhost:8080/api/health"
 |-----|------|------|
 | /api/codes | GET | 股票列表 |
 | /api/batch-quote | POST | 批量行情 |
-| /api/kline-history | GET | 历史K线（limit ≤ 800） |
+| /api/kline-history | GET | 历史K线 |
 | /api/index | GET | 指数数据 |
 | /api/market-stats | GET | 市场统计 |
+| /api/market-count | GET | 市场数量 |
+| /api/stock-codes | GET | 股票代码 |
+| /api/etf-codes | GET | ETF代码 |
 | /api/server-status | GET | 服务状态 |
 | /api/health | GET | 健康检查 |
-| /api/call-auction | GET | 集合竞价数据 |
+| /api/etf | GET | ETF列表 |
+| /api/trade-history | GET | 历史成交 |
+| /api/trade-history/full | GET | 完整历史成交 |
+| /api/minute-trade-all | GET | 全天分时成交 |
+| /api/kline-all | GET | K线全集 |
+| /api/kline-all/tdx | GET | TDX源K线 |
+| /api/kline-all/ths | GET | 同花顺源K线 |
+| /api/workday | GET | 交易日查询 |
+| /api/workday/range | GET | 交易日范围 |
+| /api/income | GET | 收益分析 |
+| /api/call-auction | GET | 集合竞价 |
 
-### 静态文件
+### 复权/股本变迁接口 🆕
 
-| 路径 | 说明 | 状态 |
+| 接口 | 方法 | 说明 |
 |-----|------|------|
-| / | Web界面 | ✅ 已实现 |
-| /static/* | 静态资源 | ✅ 已实现 |
+| /api/gbbq | GET | 股本变迁/除权除息 |
+| /api/qfq-kline | GET | 前复权K线（对齐通达信桌面端） |
+| /api/hfq-kline | GET | 后复权K线 |
 
----
+### 财务/F10接口 🆕
 
-## 🎯 使用场景
+| 接口 | 方法 | 说明 |
+|-----|------|------|
+| /api/finance | GET | 财务信息 |
+| /api/f10/category | GET | F10分类目录 |
+| /api/f10/content | GET | F10内容 |
 
-### 场景1: 量化交易系统
+### 板块/行业接口 🆕
 
-```python
-import requests
+| 接口 | 方法 | 说明 |
+|-----|------|------|
+| /api/block | GET | 板块成分 |
+| /api/block-with-index | GET | 板块成分+指数代码 |
+| /api/tdxhy | GET | 行业归属 |
+| /api/tdxzs | GET | 板块指数代码映射 |
+| /api/tdxbk | GET | 概念板块简称↔全称 |
 
-BASE_URL = "http://your-server:8080"
+### 统计/新股接口 🆕
 
-# 1. 获取所有股票代码
-codes_resp = requests.get(f"{BASE_URL}/api/codes")
-all_codes = [c['code'] for c in codes_resp.json()['data']['codes']]
+| 接口 | 方法 | 说明 |
+|-----|------|------|
+| /api/tdxstat | GET | 个股综合统计 |
+| /api/tdxstat2 | GET | 资金流向+板块归属 |
+| /api/xgsg | GET | 新股申购 |
 
-# 2. 批量获取行情（每次50只）
-for i in range(0, len(all_codes), 50):
-    batch = all_codes[i:i+50]
-    quotes = requests.post(
-        f"{BASE_URL}/api/batch-quote",
-        json={"codes": batch}
-    ).json()['data']
-    
-    # 分析行情数据
-    for quote in quotes:
-        analyze_quote(quote)
+### 报表/配置接口 🆕
 
-# 3. 获取K线进行技术分析
-kline = requests.get(
-    f"{BASE_URL}/api/kline?code=000001&type=day"
-).json()['data']['List']
+| 接口 | 方法 | 说明 |
+|-----|------|------|
+| /api/zhb-files | GET | zhb.zip文件列表 |
 
-calculate_ma(kline)  # 计算均线
-calculate_macd(kline)  # 计算MACD
-```
+### 扩展行情接口 🆕
 
-### 场景2: 实时监控面板
+| 接口 | 方法 | 说明 |
+|-----|------|------|
+| /api/ex/markets | GET | 扩展行情市场代码表 |
+| /api/ex/count | GET | 扩展行情品种数量 |
+| /api/ex/quote | GET | 扩展行情五档 |
+| /api/ex/bars | GET | 扩展行情K线 |
+| /api/ex/minute | GET | 扩展行情分时 |
+| /api/ex/trade | GET | 扩展行情分笔成交 |
 
-```javascript
-// 定时刷新行情
-setInterval(async () => {
-    // 批量获取自选股行情
-    const watchlist = ['000001', '600519', '601318'];
-    const response = await fetch('/api/batch-quote', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({codes: watchlist})
-    });
-    const quotes = await response.json();
-    
-    // 更新界面
-    updateDashboard(quotes.data);
-}, 3000);
-```
+### 数据入库接口
 
-### 场景3: 数据分析
-
-```python
-# 获取全市场数据进行分析
-import pandas as pd
-
-# 1. 获取所有股票
-codes = get_all_codes()
-
-# 2. 获取每只股票的日K线
-data = []
-for code in codes:
-    kline = get_kline(code, 'day')
-    df = pd.DataFrame(kline)
-    df['code'] = code
-    data.append(df)
-
-# 3. 合并分析
-all_data = pd.concat(data)
-
-# 4. 筛选涨停股
-limit_up = all_data[all_data['涨跌幅'] >= 9.9]
-```
-
----
-
-## 🔐 安全建议
-
-### 1. 添加认证
-
-```go
-func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        token := r.Header.Get("Authorization")
-        if token != "your-secret-token" {
-            errorResponse(w, "未授权")
-            return
-        }
-        next(w, r)
-    }
-}
-
-// 使用
-http.HandleFunc("/api/quote", authMiddleware(handleGetQuote))
-```
-
-### 2. 限流控制
-
-```go
-import "golang.org/x/time/rate"
-
-var limiter = rate.NewLimiter(10, 20) // 每秒10次，突发20次
-
-func rateLimitMiddleware(next http.HandlerFunc) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        if !limiter.Allow() {
-            errorResponse(w, "请求过于频繁")
-            return
-        }
-        next(w, r)
-    }
-}
-```
-
-### 3. CORS配置
-
-```go
-func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        w.Header().Set("Access-Control-Allow-Origin", "*")
-        w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-        
-        if r.Method == "OPTIONS" {
-            w.WriteHeader(http.StatusOK)
-            return
-        }
-        next(w, r)
-    }
-}
-```
-
----
-
-## 📊 性能优化
-
-### 1. 启用gzip压缩
-
-```go
-import "github.com/NYTimes/gziphandler"
-
-http.Handle("/api/", gziphandler.GzipHandler(apiRouter))
-```
-
-### 2. 添加缓存
-
-```go
-var cache = make(map[string]interface{})
-var cacheMux sync.RWMutex
-
-func getCached(key string) (interface{}, bool) {
-    cacheMux.RLock()
-    defer cacheMux.RUnlock()
-    val, ok := cache[key]
-    return val, ok
-}
-
-func setCache(key string, val interface{}) {
-    cacheMux.Lock()
-    defer cacheMux.Unlock()
-    cache[key] = val
-}
-```
-
----
-
-## 📖 完整文档
-
-- **API接口文档**: `API_接口文档.md`
-- **本集成指南**: `API_集成指南.md`
-- **扩展代码**: `web/server_api_extended.go`
+| 接口 | 方法 | 说明 |
+|-----|------|------|
+| /api/tasks/pull-kline | POST | K线入库任务 |
+| /api/tasks/pull-trade | POST | 成交入库任务 |
+| /api/tasks | GET | 任务列表 |
+| /api/tasks/{id} | GET | 任务详情 |
+| /api/tasks/{id}/cancel | POST | 取消任务 |
 
 ---
 
 ## ✅ 总结
 
 ### 已完成
-✅ 26个完整API接口  
-✅ 详细的接口文档  
-✅ 使用示例（Python/JavaScript/cURL）  
-✅ 集成指南  
-✅ 安全和性能建议  
+✅ 54个完整API接口
+✅ 基于通达信gbbq的前/后复权（对齐桌面端）
+✅ 财务信息/F10公司资料
+✅ 板块成分/行业归属
+✅ 个股统计/资金流向/新股申购
+✅ 扩展行情（期货/港股/外盘）
+✅ 详细的接口文档
+✅ 使用示例
+✅ 集成指南
 
 ### 使用流程
 1. 阅读 `API_接口文档.md` 了解所有接口
@@ -556,8 +503,3 @@ func setCache(key string, val interface{}) {
 3. 重新构建Docker镜像
 4. 测试接口功能
 5. 开始使用API开发应用
-
----
-
-**现在所有功能都已打包为API接口，可以直接使用！** 🎉
-
